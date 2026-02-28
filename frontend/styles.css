@@ -1,0 +1,13 @@
+.stButton > button {
+    background-color: #2D5BFF;
+    color: white;
+    border-radius: 8px;
+    height: 45px;
+    font-weight: 600;
+}
+
+.stFileUploader {
+    border: 2px dashed #ccc;
+    padding: 20px;
+    border-radius: 10px;
+}
