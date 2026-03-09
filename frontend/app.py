@@ -2,7 +2,7 @@ import streamlit as st
 from pages.login import show_login
 from pages.dashboard import show_dashboard
 
-st.set_page_config(page_title="FinSight AI", layout="centered")
+st.set_page_config(page_title="FinSight AI", layout="centered",page_icon="📊")
 
 # 🔹 Load global CSS here
 with open("styles.css") as f:

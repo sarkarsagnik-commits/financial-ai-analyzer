@@ -1,13 +1,70 @@
+/* FinSight AI — Dark Financial Theme */
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap');
+
+html, body, [class*="css"] {
+    background-color: #0c0c1a !important;
+    color: #e0e0f0 !important;
+    font-family: 'Inter', sans-serif;
+}
+
+h1, h2, h3, h4 {
+    font-family: 'Syne', sans-serif;
+    letter-spacing: -0.5px;
+}
+
 .stButton > button {
-    background-color: #2D5BFF;
+    background: linear-gradient(135deg, #4F8EF7 0%, #7B5EA7 100%);
     color: white;
+    border: none;
     border-radius: 8px;
-    height: 45px;
+    font-family: 'Inter', sans-serif;
     font-weight: 600;
+    padding: 0.55rem 1.2rem;
+    transition: opacity 0.2s;
+}
+
+.stButton > button:hover {
+    opacity: 0.88;
+}
+
+.stTextInput > div > div > input {
+    background-color: #181828 !important;
+    border: 1px solid #2a2a3d !important;
+    color: #e0e0f0 !important;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
 }
 
 .stFileUploader {
-    border: 2px dashed #ccc;
-    padding: 20px;
+    border: 2px dashed #2a2a3d;
     border-radius: 10px;
+    padding: 12px;
+}
+
+.stMetric {
+    background: #12121f;
+    border: 1px solid #2a2a3d;
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.stExpander {
+    background: #12121f;
+    border: 1px solid #2a2a3d;
+    border-radius: 10px;
+}
+
+code, .stCode {
+    font-family: 'DM Mono', monospace !important;
+    background: #181828 !important;
+    border-radius: 4px;
+}
+
+hr {
+    border-color: #2a2a3d !important;
+}
+
+.stTabs [data-baseweb="tab"] {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
 }
