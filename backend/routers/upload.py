@@ -10,7 +10,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    if not file.filename.endswith(".pdf"):
+    if not file.filename or not file.filename.endswith(".pdf"):
         return {"error": "Only PDF files are allowed"}
 
     file_id = str(uuid.uuid4())
