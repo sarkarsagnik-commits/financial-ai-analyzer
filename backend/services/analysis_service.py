@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """
 analysis_service.py — Document ingestion + analysis modules
 ============================================================
@@ -402,7 +401,10 @@ def run_analysis(document_id: str, modules: List[str]) -> Dict[str, Any]:
             results[module] = {"error": f"Unknown module: '{module}'"}
 
     return results
-=======
+
+
+#RAG pipeline--------------------------------------------
+
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain.embeddings.openai import OpenAIEmbeddings
@@ -501,4 +503,3 @@ def analyze_financial_report(parsed_text: str, query: str):
     result = generate_analysis(query)
 
     return result
->>>>>>> feature/RAG
