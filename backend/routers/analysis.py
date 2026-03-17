@@ -1,12 +1,37 @@
 from fastapi import APIRouter, Depends, HTTPException
-from models.request_models import AnalysisRequest, LoginRequest, RegisterRequest, QueryRequest
-from models.response_models import AnalysisResponse, TokenResponse
-from services.analysis_service import run_analysis, query_document
+
+from backend.models.request_models import (
+    AnalysisRequest,
+    LoginRequest,
+    RegisterRequest,
+    QueryRequest
+)
+
+from utils.db import (
+    list_documents,
+    delete_document_chunks,
+    document_exists,
+    get_document_chunk_count,
+)
+
+from backend.models.response_models import (
+    AnalysisResponse,
+    TokenResponse
+)
+
+from backend.services.analysis_service import (
+    analyze_financial_report,
+    run_analysis,
+    query_document
+)
+
 from utils.jwt_handler import get_current_user, create_access_token
 from utils.auth_utils import authenticate_user, create_user
 from config import settings
 
 router = APIRouter()
+
+
 
 
 # ── Auth endpoints ─────────────────────────────────────────────────────────
@@ -28,6 +53,20 @@ def register(payload: RegisterRequest):
         raise HTTPException(status_code=409, detail=str(e))
     token = create_access_token({"sub": user["id"], "email": user["email"]})
     return TokenResponse(access_token=token, expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+
+@router.post("/analysis", response_model=AnalysisResponse)
+async def analyze(request: AnalysisRequest):
+
+    # In production this text will come from parser
+    parsed_text = "Financial report text goes here"
+
+    result = analyze_financial_report(parsed_text, request.query)
+
+    return AnalysisResponse(
+        summary=result,
+        key_insights="Generated insights",
+        investment_advice="Generated advice",
+    )
 
 
 # ── Analysis endpoints ─────────────────────────────────────────────────────
@@ -62,12 +101,6 @@ def semantic_query(
 
 # ── Document management endpoints ──────────────────────────────────────────
 
-from utils.db import (
-    list_documents,
-    delete_document_chunks,
-    document_exists,
-    get_document_chunk_count,
-)
 
 
 @router.get("/documents", tags=["Documents"])

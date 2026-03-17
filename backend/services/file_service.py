@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import os
 import uuid
 import shutil
@@ -41,3 +42,10 @@ def get_document_path(document_id: str) -> str:
         if fname.startswith(document_id):
             return os.path.join(settings.UPLOAD_DIR, fname)
     raise HTTPException(status_code=404, detail=f"Document {document_id} not found.")
+=======
+def process_parsed_pdf(parsed_output: str):
+    """
+    Receives parsed text from the PDF parser
+    """
+    return parsed_output
+>>>>>>> feature/RAG

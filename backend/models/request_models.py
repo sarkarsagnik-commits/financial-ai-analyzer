@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 
@@ -23,3 +24,10 @@ class QueryRequest(BaseModel):
     document_id: str
     query: str
     top_k: int = 5
+=======
+from pydantic import BaseModel
+
+
+class AnalysisRequest(BaseModel):
+    query: str
+>>>>>>> feature/RAG
