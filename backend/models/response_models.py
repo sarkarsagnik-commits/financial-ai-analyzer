@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-<<<<<<< HEAD
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -61,11 +60,11 @@ class AnalysisResponse(BaseModel):
 class ErrorResponse(BaseModel):
     detail: str
     error_code: Optional[str] = None
-=======
 
 
-class AnalysisResponse(BaseModel):
+# --- RAG (from feature/RAG) ---
+
+class RAGAnalysisResponse(BaseModel):
     summary: str
     key_insights: str
     investment_advice: str
->>>>>>> feature/RAG

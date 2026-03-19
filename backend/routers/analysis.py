@@ -1,30 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
-
-from backend.models.request_models import (
-    AnalysisRequest,
-    LoginRequest,
-    RegisterRequest,
-    QueryRequest
-)
-
-from utils.db import (
-    list_documents,
-    delete_document_chunks,
-    document_exists,
-    get_document_chunk_count,
-)
-
-from backend.models.response_models import (
-    AnalysisResponse,
-    TokenResponse
-)
-
-from backend.services.analysis_service import (
-    analyze_financial_report,
-    run_analysis,
-    query_document
-)
-
+from models.request_models import AnalysisRequest, LoginRequest, RegisterRequest, QueryRequest, RAGQueryRequest
+from models.response_models import AnalysisResponse, TokenResponse, RAGAnalysisResponse
+from services.analysis_service import run_analysis, query_document, analyze_financial_report
 from utils.jwt_handler import get_current_user, create_access_token
 from utils.auth_utils import authenticate_user, create_user
 from config import settings
@@ -32,9 +9,7 @@ from config import settings
 router = APIRouter()
 
 
-
-
-# ── Auth endpoints ─────────────────────────────────────────────────────────
+# ── Auth endpoints ────────────────────────────────────────────────────────
 
 @router.post("/auth/login", response_model=TokenResponse, tags=["Auth"])
 def login(payload: LoginRequest):
@@ -54,22 +29,8 @@ def register(payload: RegisterRequest):
     token = create_access_token({"sub": user["id"], "email": user["email"]})
     return TokenResponse(access_token=token, expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
 
-@router.post("/analysis", response_model=AnalysisResponse)
-async def analyze(request: AnalysisRequest):
 
-    # In production this text will come from parser
-    parsed_text = "Financial report text goes here"
-
-    result = analyze_financial_report(parsed_text, request.query)
-
-    return AnalysisResponse(
-        summary=result,
-        key_insights="Generated insights",
-        investment_advice="Generated advice",
-    )
-
-
-# ── Analysis endpoints ─────────────────────────────────────────────────────
+# ── Analysis endpoints ────────────────────────────────────────────────────
 
 @router.post("/run", response_model=AnalysisResponse)
 def run_analysis_endpoint(
@@ -99,8 +60,44 @@ def semantic_query(
     return {"document_id": payload.document_id, "query": payload.query, "results": chunks}
 
 
-# ── Document management endpoints ──────────────────────────────────────────
+# ── RAG endpoint (from feature/RAG) ──────────────────────────────────────
 
+@router.post("/rag", response_model=RAGAnalysisResponse, tags=["RAG"])
+def rag_analysis(
+    payload: RAGQueryRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    RAG-powered financial analysis.
+    Uses LangChain + FAISS + OpenAI to answer queries about financial documents.
+    Requires OPENAI_API_KEY to be set in environment.
+    """
+    if not settings.OPENAI_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="OPENAI_API_KEY is not configured. Set it in .env file.",
+        )
+
+    # In production, parsed_text would come from an uploaded document
+    parsed_text = "Financial report text goes here"
+
+    result = analyze_financial_report(parsed_text, payload.query)
+
+    return RAGAnalysisResponse(
+        summary=result,
+        key_insights="Generated insights",
+        investment_advice="Generated advice",
+    )
+
+
+# ── Document management endpoints ────────────────────────────────────────
+
+from utils.db import (
+    list_documents,
+    delete_document_chunks,
+    document_exists,
+    get_document_chunk_count,
+)
 
 
 @router.get("/documents", tags=["Documents"])

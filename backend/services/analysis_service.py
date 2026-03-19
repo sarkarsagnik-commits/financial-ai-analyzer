@@ -1,32 +1,35 @@
 """
-analysis_service.py — Document ingestion + analysis modules
-============================================================
+analysis_service.py — Document ingestion + analysis modules + RAG pipeline
+============================================================================
 All ChromaDB operations are delegated to utils/db.py.
 This module handles:
   - PDF text extraction + chunking
   - Document ingestion pipeline
   - Three analysis modules: Financial Changes, Risk Radar, Management Outlook
+  - RAG pipeline (LangChain + FAISS): chunk → embed → query → LLM answer
 """
 
 import re
 import logging
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 import pypdf
 
 from utils.db import (
     upsert_chunks,
+    query_chunks,
     query_chunks_text_only,
     delete_document_chunks,
     document_exists,
     get_document_chunk_count,
 )
+from config import settings
 
 logger = logging.getLogger(__name__)
 
 
-# ── PDF helpers ────────────────────────────────────────────────────────────
+# ── PDF helpers ───────────────────────────────────────────────────────────
 
 def extract_text_from_pdf(file_path: str) -> tuple[str, int]:
     """
@@ -69,7 +72,7 @@ def chunk_text(
     return chunks
 
 
-# ── Ingestion pipeline ─────────────────────────────────────────────────────
+# ── Ingestion pipeline ────────────────────────────────────────────────────
 
 def ingest_document(
     document_id: str,
@@ -141,7 +144,7 @@ def ingest_document(
     }
 
 
-# ── Analysis modules ───────────────────────────────────────────────────────
+# ── Analysis modules ──────────────────────────────────────────────────────
 
 def run_financial_changes(document_id: str) -> Dict[str, Any]:
     """
@@ -368,7 +371,7 @@ def run_management_outlook(document_id: str) -> Dict[str, Any]:
     }
 
 
-# ── Dispatcher ─────────────────────────────────────────────────────────────
+# ── Dispatcher ────────────────────────────────────────────────────────────
 
 MODULE_MAP = {
     "Financial Changes": run_financial_changes,
@@ -403,64 +406,97 @@ def run_analysis(document_id: str, modules: List[str]) -> Dict[str, Any]:
     return results
 
 
-#RAG pipeline--------------------------------------------
+def query_document(
+    document_id: str,
+    query: str,
+    top_k: int = 5,
+) -> List[Dict[str, Any]]:
+    """
+    Semantic search over an ingested document's chunks.
+    Returns list of matching chunks with metadata.
+    """
+    if not document_exists(document_id):
+        return [{"error": f"Document '{document_id}' not found in ChromaDB."}]
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import FAISS
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.chat_models import ChatOpenAI
-from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
-
-from backend.utils.config import (
-    CHUNK_SIZE,
-    CHUNK_OVERLAP,
-    EMBEDDING_MODEL,
-    LLM_MODEL,
-    VECTOR_DB_PATH,
-)
-
-vector_store = None
-
-
-def chunk_document(text: str):
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
+    return query_chunks(
+        query=query,
+        document_id=document_id,
+        top_k=top_k,
+        include_distances=True,
     )
 
+
+# ── RAG Pipeline (from feature/RAG) ──────────────────────────────────────
+#
+# Uses LangChain + FAISS for a self-contained RAG flow:
+#   1. chunk_document()   → split text with RecursiveCharacterTextSplitter
+#   2. build_vector_store → embed with OpenAI and store in FAISS
+#   3. generate_analysis  → RetrievalQA chain with GPT prompt
+#   4. analyze_financial_report → end-to-end pipeline
+#
+# NOTE: This uses FAISS (separate from ChromaDB) and requires OPENAI_API_KEY.
+
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+
+_rag_vector_store = None
+
+
+def chunk_document(text: str) -> List[str]:
+    """Split text using LangChain's RecursiveCharacterTextSplitter."""
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=settings.CHUNK_SIZE,
+        chunk_overlap=settings.CHUNK_OVERLAP,
+    )
     return splitter.split_text(text)
 
 
-def build_vector_store(chunks):
-    global vector_store
+def build_rag_vector_store(chunks: List[str]):
+    """Embed chunks with OpenAI and store in FAISS."""
+    global _rag_vector_store
 
-    embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+    embeddings = OpenAIEmbeddings(
+        model=settings.EMBEDDING_MODEL,
+        openai_api_key=settings.OPENAI_API_KEY,
+    )
 
-    vector_store = FAISS.from_texts(
+    _rag_vector_store = FAISS.from_texts(
         chunks,
-        embedding=embeddings
+        embedding=embeddings,
     )
 
-    vector_store.save_local(VECTOR_DB_PATH)
+    _rag_vector_store.save_local(settings.VECTOR_DB_PATH)
 
 
-def load_vector_store():
-    global vector_store
+def load_rag_vector_store():
+    """Load a previously saved FAISS vector store."""
+    global _rag_vector_store
 
-    embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+    embeddings = OpenAIEmbeddings(
+        model=settings.EMBEDDING_MODEL,
+        openai_api_key=settings.OPENAI_API_KEY,
+    )
 
-    vector_store = FAISS.load_local(
-        VECTOR_DB_PATH,
+    _rag_vector_store = FAISS.load_local(
+        settings.VECTOR_DB_PATH,
         embeddings,
-        allow_dangerous_deserialization=True
+        allow_dangerous_deserialization=True,
     )
 
 
-def generate_analysis(query: str):
+def generate_rag_analysis(query: str) -> str:
+    """Retrieve relevant chunks from FAISS and generate analysis via LLM."""
+    if _rag_vector_store is None:
+        raise RuntimeError("RAG vector store not initialized. Call build_rag_vector_store first.")
 
-    llm = ChatOpenAI(model=LLM_MODEL)
+    # Retrieve relevant chunks
+    retriever = _rag_vector_store.as_retriever()
+    docs = retriever.invoke(query)
+    context = "\n\n".join(doc.page_content for doc in docs)
 
+    # Build prompt
     prompt = PromptTemplate(
         template="""
 You are a financial analyst.
@@ -480,26 +516,25 @@ Question:
         input_variables=["context", "question"],
     )
 
-    qa = RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=vector_store.as_retriever(),
-        chain_type_kwargs={"prompt": prompt},
+    # Generate via LLM
+    llm = ChatOpenAI(
+        model=settings.LLM_MODEL,
+        openai_api_key=settings.OPENAI_API_KEY,
     )
 
-    result = qa.run(query)
+    formatted_prompt = prompt.format(context=context, question=query)
+    response = llm.invoke(formatted_prompt)
+    return response.content
 
-    return result
 
-
-def analyze_financial_report(parsed_text: str, query: str):
+def analyze_financial_report(parsed_text: str, query: str) -> str:
     """
-    Full RAG pipeline
+    Full RAG pipeline:
+      1. Chunk the parsed text
+      2. Build FAISS vector store
+      3. Generate analysis via LLM
     """
-
     chunks = chunk_document(parsed_text)
-
-    build_vector_store(chunks)
-
-    result = generate_analysis(query)
-
+    build_rag_vector_store(chunks)
+    result = generate_rag_analysis(query)
     return result
