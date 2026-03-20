@@ -1,20 +1,27 @@
-# Virtual environment
-venv/
+# Environment
+.env
+*.env
 
+# ChromaDB data
+chroma_db/
+backend/chroma_db/
 
-# Python cache
+# Uploads
+uploads/
+backend/uploads/
+
+# Python
 __pycache__/
 *.pyc
-
-# Environment variables
-.env
-
-# Persistent file storage
-backend/data/
-
-# OS
-Thumbs.db
-.DS_Store
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
 
 # VS Code
 .vscode/
+
+# OS
+.DS_Store
+Thumbs.db
