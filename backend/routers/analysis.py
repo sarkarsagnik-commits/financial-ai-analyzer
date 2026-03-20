@@ -1,9 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
 from models.request_models import AnalysisRequest, LoginRequest, RegisterRequest, QueryRequest, RAGQueryRequest
 from models.response_models import AnalysisResponse, TokenResponse, RAGAnalysisResponse
-from services.analysis_service import run_analysis, query_document, analyze_financial_report
+from services.analysis_service import run_analysis, query_document, analyze_financial_report, extract_text_from_pdf
+from services.file_service import get_document_path
 from utils.jwt_handler import get_current_user, create_access_token
 from utils.auth_utils import authenticate_user, create_user
+from utils.db import (
+    list_documents,
+    delete_document_chunks,
+    document_exists,
+    get_document_chunk_count,
+)
 from config import settings
 
 router = APIRouter()
@@ -78,26 +85,23 @@ def rag_analysis(
             detail="OPENAI_API_KEY is not configured. Set it in .env file.",
         )
 
-    # In production, parsed_text would come from an uploaded document
-    parsed_text = "Financial report text goes here"
+    if not payload.document_id:
+        raise HTTPException(status_code=400, detail="document_id is required for RAG analysis.")
 
-    result = analyze_financial_report(parsed_text, payload.query)
+    # Read actual uploaded document text
+    file_path = get_document_path(payload.document_id)
+    parsed_text, _ = extract_text_from_pdf(file_path)
+
+    result = analyze_financial_report(parsed_text, payload.query, payload.document_id)
 
     return RAGAnalysisResponse(
         summary=result,
-        key_insights="Generated insights",
-        investment_advice="Generated advice",
+        key_insights="See summary for detailed insights",
+        investment_advice="See summary for investment advice",
     )
 
 
 # ── Document management endpoints ────────────────────────────────────────
-
-from utils.db import (
-    list_documents,
-    delete_document_chunks,
-    document_exists,
-    get_document_chunk_count,
-)
 
 
 @router.get("/documents", tags=["Documents"])

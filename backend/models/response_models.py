@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -49,12 +49,7 @@ class AnalysisResponse(BaseModel):
     status: str
     modules_run: List[str]
     results: Dict[str, Any]
-    created_at: datetime = None
-
-    def __init__(self, **data):
-        if "created_at" not in data:
-            data["created_at"] = datetime.utcnow()
-        super().__init__(**data)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ErrorResponse(BaseModel):

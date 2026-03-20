@@ -164,7 +164,10 @@ def show_dashboard():
                     if resp.status_code == 200:
                         chunks = resp.json().get("results", [])
                         for i, chunk in enumerate(chunks, 1):
-                            result_card(f"Result {i}", chunk)
+                            text = chunk.get("text", str(chunk)) if isinstance(chunk, dict) else str(chunk)
+                            similarity = chunk.get("similarity", "") if isinstance(chunk, dict) else ""
+                            label = f"Result {i}" + (f" ({similarity:.0%} match)" if similarity else "")
+                            result_card(label, text)
                     else:
                         st.error("Search failed.")
                 except requests.exceptions.ConnectionError:

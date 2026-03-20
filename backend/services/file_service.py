@@ -51,10 +51,3 @@ def get_document_path(document_id: str) -> str:
     raise HTTPException(
         status_code=404, detail=f"Document {document_id} not found."
     )
-
-
-# --- RAG (from feature/RAG) ---
-
-def process_parsed_pdf(parsed_output: str):
-    """Receives parsed text from the PDF parser."""
-    return parsed_output

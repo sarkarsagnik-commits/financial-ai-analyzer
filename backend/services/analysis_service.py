@@ -441,7 +441,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 
-_rag_vector_store = None
+_rag_vector_stores: dict = {}  # keyed by document_id
 
 
 def chunk_document(text: str) -> List[str]:
@@ -453,46 +453,45 @@ def chunk_document(text: str) -> List[str]:
     return splitter.split_text(text)
 
 
-def build_rag_vector_store(chunks: List[str]):
+def build_rag_vector_store(chunks: List[str], document_id: str = "default"):
     """Embed chunks with OpenAI and store in FAISS."""
-    global _rag_vector_store
+    global _rag_vector_stores
 
     embeddings = OpenAIEmbeddings(
         model=settings.EMBEDDING_MODEL,
         openai_api_key=settings.OPENAI_API_KEY,
     )
 
-    _rag_vector_store = FAISS.from_texts(
+    _rag_vector_stores[document_id] = FAISS.from_texts(
         chunks,
         embedding=embeddings,
     )
 
-    _rag_vector_store.save_local(settings.VECTOR_DB_PATH)
 
-
-def load_rag_vector_store():
+def load_rag_vector_store(document_id: str = "default"):
     """Load a previously saved FAISS vector store."""
-    global _rag_vector_store
+    global _rag_vector_stores
 
     embeddings = OpenAIEmbeddings(
         model=settings.EMBEDDING_MODEL,
         openai_api_key=settings.OPENAI_API_KEY,
     )
 
-    _rag_vector_store = FAISS.load_local(
+    _rag_vector_stores[document_id] = FAISS.load_local(
         settings.VECTOR_DB_PATH,
         embeddings,
         allow_dangerous_deserialization=True,
     )
 
 
-def generate_rag_analysis(query: str) -> str:
+def generate_rag_analysis(query: str, document_id: str = "default") -> str:
     """Retrieve relevant chunks from FAISS and generate analysis via LLM."""
-    if _rag_vector_store is None:
+    store = _rag_vector_stores.get(document_id)
+    if store is None:
         raise RuntimeError("RAG vector store not initialized. Call build_rag_vector_store first.")
 
     # Retrieve relevant chunks
-    retriever = _rag_vector_store.as_retriever()
+    retriever = store.as_retriever()
     docs = retriever.invoke(query)
     context = "\n\n".join(doc.page_content for doc in docs)
 
@@ -527,7 +526,7 @@ Question:
     return response.content
 
 
-def analyze_financial_report(parsed_text: str, query: str) -> str:
+def analyze_financial_report(parsed_text: str, query: str, document_id: str = "default") -> str:
     """
     Full RAG pipeline:
       1. Chunk the parsed text
@@ -535,6 +534,6 @@ def analyze_financial_report(parsed_text: str, query: str) -> str:
       3. Generate analysis via LLM
     """
     chunks = chunk_document(parsed_text)
-    build_rag_vector_store(chunks)
-    result = generate_rag_analysis(query)
+    build_rag_vector_store(chunks, document_id)
+    result = generate_rag_analysis(query, document_id)
     return result

@@ -1,4 +1,5 @@
 import hashlib
+import os
 import secrets
 from typing import Optional
 
@@ -39,8 +40,8 @@ def create_user(email: str, password: str, full_name: Optional[str] = None) -> d
 
 def authenticate_user(email: str, password: str) -> Optional[dict]:
     """Returns user dict if credentials valid, else None."""
-    # Hardcoded demo user (remove in production)
-    if email == "1" and password == "1":
+    # Demo login — disable in production with DISABLE_DEMO_LOGIN=1
+    if not os.getenv("DISABLE_DEMO_LOGIN") and email == "1" and password == "1":
         return {"id": "demo-user", "email": "1", "full_name": "Demo User"}
 
     user = _USER_STORE.get(email)
