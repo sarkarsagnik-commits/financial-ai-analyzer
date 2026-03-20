@@ -203,6 +203,10 @@ def run_financial_changes(document_id: str) -> Dict[str, Any]:
         except ValueError:
             pass
 
+    # LLM enrichment (graceful degradation without API key)
+    ai_context = f"Metrics: {metrics_found}, YoY changes: {yoy_changes}"
+    ai_explanation = enrich_with_llm(ai_context, "Financial Changes")
+
     return {
         "metrics": metrics_found if metrics_found else {"note": "No structured metrics found. Consider LLM enrichment."},
         "yoy_changes": yoy_changes if yoy_changes else {"note": "No year-over-year pairs detected in top chunks."},
@@ -212,6 +216,7 @@ def run_financial_changes(document_id: str) -> Dict[str, Any]:
             f"Extracted {len(metrics_found)} financial metrics "
             f"and {len(yoy_changes)} year-over-year comparisons."
         ),
+        "ai_explanation": ai_explanation,
         "context_preview": context[:600] + "…" if len(context) > 600 else context,
     }
 
@@ -278,6 +283,10 @@ def run_risk_radar(document_id: str) -> Dict[str, Any]:
     high_count = sum(1 for r in found_risks if r["severity"] == "High")
     med_count  = sum(1 for r in found_risks if r["severity"] == "Medium")
 
+    # LLM enrichment
+    risk_summary = "; ".join(f"{r['type']} ({r['severity']})" for r in found_risks[:5])
+    ai_explanation = enrich_with_llm(risk_summary, "Risk Radar")
+
     return {
         "risk_factors": found_risks,
         "severity_breakdown": severity_breakdown,
@@ -287,6 +296,7 @@ def run_risk_radar(document_id: str) -> Dict[str, Any]:
             f"Identified {len(found_risks)} risk categories across {len(chunks)} chunks. "
             f"{high_count} High severity, {med_count} Medium severity risks detected."
         ),
+        "ai_explanation": ai_explanation,
     }
 
 
@@ -356,6 +366,10 @@ def run_management_outlook(document_id: str) -> Dict[str, Any]:
     )
     top_themes = [w for w, _ in key_themes[:10]]
 
+    # LLM enrichment
+    outlook_context = f"Tone: {tone} ({tone_score:.0%}), Top themes: {', '.join(top_themes)}, Forward statements: {len(forward_statements)}"
+    ai_explanation = enrich_with_llm(outlook_context, "Management Outlook")
+
     return {
         "tone": tone,
         "tone_score": tone_score,
@@ -368,7 +382,52 @@ def run_management_outlook(document_id: str) -> Dict[str, Any]:
             f"{pos_count} positive vs {neg_count} negative signals. "
             f"Extracted {len(forward_statements)} forward-looking statements."
         ),
+        "ai_explanation": ai_explanation,
     }
+
+
+# ── LLM Enrichment ────────────────────────────────────────────────────────
+
+def enrich_with_llm(extracted_data: str, module_name: str) -> str:
+    """
+    Generate an AI explanation of extracted analysis data.
+    Returns a fallback message if OPENAI_API_KEY is not configured.
+    """
+    if not settings.OPENAI_API_KEY:
+        return "AI explanation unavailable — set OPENAI_API_KEY in .env to enable."
+
+    try:
+        from langchain_openai import ChatOpenAI as _ChatOpenAI
+
+        llm = _ChatOpenAI(
+            model=settings.LLM_MODEL,
+            openai_api_key=settings.OPENAI_API_KEY,
+        )
+
+        prompts = {
+            "Financial Changes": (
+                "You are a financial analyst. Based on these extracted metrics "
+                "from an SEC filing, write a 2-3 sentence explanation of the "
+                "key financial changes and what they mean for the company:\n\n"
+            ),
+            "Risk Radar": (
+                "You are a risk analyst. Based on these identified risk factors "
+                "from an SEC filing, write a concise executive summary of the "
+                "top risks and their potential impact:\n\n"
+            ),
+            "Management Outlook": (
+                "You are an equity analyst. Based on this tone analysis and "
+                "forward-looking statements from management, summarize the "
+                "overall management sentiment and outlook in 2-3 sentences:\n\n"
+            ),
+        }
+
+        prompt = prompts.get(module_name, "Analyze:\n\n") + extracted_data
+        response = llm.invoke(prompt)
+        return response.content
+    except Exception as e:
+        logger.error(f"LLM enrichment failed for {module_name}: {e}")
+        return f"AI explanation failed: {str(e)}"
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────────

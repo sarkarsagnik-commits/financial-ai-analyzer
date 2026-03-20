@@ -124,6 +124,9 @@ def show_dashboard():
                     st.markdown("**Key Metrics**")
                     st.json(result.get("metrics", {}))
                     result_card("Summary", result.get("summary", ""))
+                    if result.get("ai_explanation"):
+                        st.markdown("**🤖 AI Explanation**")
+                        st.info(result["ai_explanation"])
                     if "context_preview" in result:
                         st.caption("Context preview: " + result["context_preview"])
 
@@ -135,6 +138,9 @@ def show_dashboard():
                     for risk in result.get("risk_factors", []):
                         result_card(risk["type"], risk.get("excerpt", ""))
                     result_card("Summary", result.get("summary", ""))
+                    if result.get("ai_explanation"):
+                        st.markdown("**🤖 AI Explanation**")
+                        st.info(result["ai_explanation"])
 
                 elif module_name == "Management Outlook":
                     tone = result.get("tone", "N/A")
@@ -146,6 +152,9 @@ def show_dashboard():
                     for stmt in result.get("forward_guidance", []):
                         st.markdown(f"- {stmt}")
                     result_card("Summary", result.get("summary", ""))
+                    if result.get("ai_explanation"):
+                        st.markdown("**🤖 AI Explanation**")
+                        st.info(result["ai_explanation"])
 
     # ── Semantic search ────────────────────────────────────────────────────
     if document_id:
