@@ -41,8 +41,8 @@ def create_user(email: str, password: str, full_name: Optional[str] = None) -> d
 def authenticate_user(email: str, password: str) -> Optional[dict]:
     """Returns user dict if credentials valid, else None."""
     # Demo login — disable in production with DISABLE_DEMO_LOGIN=1
-    if not os.getenv("DISABLE_DEMO_LOGIN") and email == "1" and password == "1":
-        return {"id": "demo-user", "email": "1", "full_name": "Demo User"}
+    if not os.getenv("DISABLE_DEMO_LOGIN") and email == "demo@example.com" and password == "demo123":
+        return {"id": "demo-user", "email": "demo@example.com", "full_name": "Demo User"}
 
     user = _USER_STORE.get(email)
     if not user:
