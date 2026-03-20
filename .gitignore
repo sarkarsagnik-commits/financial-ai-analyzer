@@ -1,14 +1,22 @@
 # Environment
 .env
 *.env
+!.env.example
 
 # ChromaDB data
 chroma_db/
 backend/chroma_db/
 
+# FAISS / RAG vector store
+vector_store/
+backend/vector_store/
+
 # Uploads
 uploads/
 backend/uploads/
+
+# Sample data
+backend/data/*.pdf
 
 # Python
 __pycache__/
