@@ -603,6 +603,58 @@ Question:
     return response.content
 
 
+async def stream_rag_analysis(query: str, document_id: str = "default"):
+    """
+    Async generator that streams RAG analysis token-by-token.
+    Uses the same retrieval and prompt logic as generate_rag_analysis
+    but yields tokens incrementally via LangChain astream().
+    """
+    store = _rag_vector_stores.get(document_id)
+    if store is None:
+        raise RuntimeError("RAG vector store not initialized. Call build_rag_vector_store first.")
+
+    # Retrieve relevant chunks using MMR for diversity
+    retriever = store.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": 4, "fetch_k": 20, "lambda_mult": 0.7},
+    )
+    docs = retriever.invoke(query)
+    context = "\n\n".join(doc.page_content for doc in docs)
+
+    # Build prompt
+    prompt = PromptTemplate(
+        template="""
+You are a financial analyst.
+
+Using the financial report context below, provide:
+
+1. A summary of the company's financial health
+2. Key insights
+3. Investment advice
+
+Context:
+{context}
+
+Question:
+{question}
+""",
+        input_variables=["context", "question"],
+    )
+
+    formatted_prompt = prompt.format(context=context, question=query)
+
+    # Stream via LLM with streaming=True
+    llm = ChatOpenAI(
+        model=settings.LLM_MODEL,
+        openai_api_key=settings.OPENAI_API_KEY,
+        streaming=True,
+    )
+
+    async for chunk in llm.astream(formatted_prompt):
+        if chunk.content:
+            yield chunk.content
+
+
 def analyze_financial_report(parsed_text: str, query: str, document_id: str = "default") -> str:
     """
     Full RAG pipeline:
@@ -614,3 +666,12 @@ def analyze_financial_report(parsed_text: str, query: str, document_id: str = "d
     build_rag_vector_store(chunks, document_id)
     result = generate_rag_analysis(query, document_id)
     return result
+
+
+def prepare_rag_pipeline(parsed_text: str, document_id: str = "default"):
+    """
+    Prepare the RAG pipeline (chunk + embed) without generating the answer.
+    Used by the streaming endpoint to separate ingestion from generation.
+    """
+    chunks = chunk_document(parsed_text)
+    build_rag_vector_store(chunks, document_id)

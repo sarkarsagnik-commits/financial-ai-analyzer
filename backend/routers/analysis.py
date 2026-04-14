@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from models.request_models import AnalysisRequest, LoginRequest, RegisterRequest, QueryRequest, RAGQueryRequest
 from models.response_models import AnalysisResponse, TokenResponse, RAGAnalysisResponse
-from services.analysis_service import run_analysis, query_document, analyze_financial_report, extract_text_from_pdf
+from services.analysis_service import run_analysis, query_document, analyze_financial_report, extract_text_from_pdf, stream_rag_analysis, prepare_rag_pipeline
 from services.file_service import get_document_path
 from utils.jwt_handler import get_current_user, create_access_token
 from utils.auth_utils import authenticate_user, create_user
@@ -98,6 +99,37 @@ def rag_analysis(
         summary=result,
         key_insights="See summary for detailed insights",
         investment_advice="See summary for investment advice",
+    )
+
+
+@router.post("/rag/stream", tags=["RAG"])
+async def rag_analysis_stream(
+    payload: RAGQueryRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Streaming RAG-powered financial analysis.
+    Streams tokens as they are generated for lower perceived latency.
+    """
+    if not settings.OPENAI_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="OPENAI_API_KEY is not configured. Set it in .env file.",
+        )
+
+    if not payload.document_id:
+        raise HTTPException(status_code=400, detail="document_id is required for RAG analysis.")
+
+    # Read actual uploaded document text
+    file_path = get_document_path(payload.document_id)
+    parsed_text, _ = extract_text_from_pdf(file_path)
+
+    # Prepare the vector store (chunk + embed) before streaming
+    prepare_rag_pipeline(parsed_text, payload.document_id)
+
+    return StreamingResponse(
+        stream_rag_analysis(payload.query, payload.document_id),
+        media_type="text/plain",
     )
 
 
