@@ -564,8 +564,11 @@ def generate_rag_analysis(query: str, document_id: str = "default") -> str:
     if store is None:
         raise RuntimeError("RAG vector store not initialized. Call build_rag_vector_store first.")
 
-    # Retrieve relevant chunks
-    retriever = store.as_retriever()
+    # Retrieve relevant chunks using MMR for diversity
+    retriever = store.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": 4, "fetch_k": 20, "lambda_mult": 0.7},
+    )
     docs = retriever.invoke(query)
     context = "\n\n".join(doc.page_content for doc in docs)
 
