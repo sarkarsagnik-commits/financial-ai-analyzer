@@ -187,7 +187,8 @@ def run_financial_changes(document_id: str) -> Dict[str, Any]:
         match = re.search(pattern, context, re.IGNORECASE)
         if match:
             value = match.group(1).replace(",", "")
-            unit = (match.group(2) or "").capitalize()
+            # Safely check if a second group exists in the regex pattern
+            unit = (match.group(2) or "").capitalize() if len(match.groups()) > 1 else ""
             metrics_found[label] = f"${value} {unit}".strip()
 
     # Try to find two-year comparison values (e.g. "2023: $X  2022: $Y")
@@ -388,11 +389,22 @@ def run_management_outlook(document_id: str) -> Dict[str, Any]:
 
 # ── LLM Enrichment ────────────────────────────────────────────────────────
 
+# Cache for LLM responses: avoids redundant API calls for identical inputs
+_llm_cache: Dict[tuple, str] = {}
+
+
 def enrich_with_llm(extracted_data: str, module_name: str) -> str:
     """
     Generate an AI explanation of extracted analysis data.
     Returns a fallback message if OPENAI_API_KEY is not configured.
+    Results are cached by (extracted_data, module_name) to avoid
+    redundant API calls on repeated analysis runs.
     """
+    cache_key = (extracted_data, module_name)
+    if cache_key in _llm_cache:
+        logger.info(f"LLM cache hit for {module_name} — skipping API call")
+        return _llm_cache[cache_key]
+
     if not settings.OPENAI_API_KEY:
         return "AI explanation unavailable — set OPENAI_API_KEY in .env to enable."
 
@@ -424,7 +436,10 @@ def enrich_with_llm(extracted_data: str, module_name: str) -> str:
 
         prompt = prompts.get(module_name, "Analyze:\n\n") + extracted_data
         response = llm.invoke(prompt)
-        return response.content
+        result = response.content
+        _llm_cache[cache_key] = result
+        logger.info(f"LLM response cached for {module_name}")
+        return result
     except Exception as e:
         logger.error(f"LLM enrichment failed for {module_name}: {e}")
         return f"AI explanation failed: {str(e)}"
