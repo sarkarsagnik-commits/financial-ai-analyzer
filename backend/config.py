@@ -23,10 +23,17 @@ class Settings(BaseSettings):
     # Anthropic (Claude)
     ANTHROPIC_API_KEY: str = ""
 
+    # GROQ
+    GROQ_API_KEY: str = ""
+
+    # API
+    API_BASE_URL: str = "http://localhost:8000"
+    DISABLE_DEMO_LOGIN: int = 0
+
     # --- RAG Configuration (from feature/RAG) ---
     OPENAI_API_KEY: str = ""
-    EMBEDDING_MODEL: str = "text-embedding-3-small"
-    LLM_MODEL: str = "gpt-4o-mini"
+    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    LLM_MODEL: str = "llama3-8b-8192"
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
     VECTOR_DB_PATH: str = "./vector_store"

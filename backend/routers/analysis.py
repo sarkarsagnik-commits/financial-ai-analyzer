@@ -1,5 +1,6 @@
+# Fixed - import StreamingResponse from starlette directly
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from starlette.responses import StreamingResponse
 from models.request_models import AnalysisRequest, LoginRequest, RegisterRequest, QueryRequest, RAGQueryRequest
 from models.response_models import AnalysisResponse, TokenResponse, RAGAnalysisResponse
 from services.analysis_service import run_analysis, query_document, analyze_financial_report, extract_text_from_pdf, stream_rag_analysis, prepare_rag_pipeline

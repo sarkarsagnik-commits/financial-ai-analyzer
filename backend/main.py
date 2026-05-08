@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import analysis, upload
+from routers.analysis import router as analysis_router
+from routers.upload import router as upload_router
 from config import settings
 from utils.db import health_check as chroma_health
 
@@ -18,8 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(upload.router,   prefix="/api/upload",   tags=["Upload"])
-app.include_router(analysis.router, prefix="/api/analysis", tags=["Analysis"])
+app.include_router(upload_router, prefix="/api/upload", tags=["Upload"])
+app.include_router(analysis_router, prefix="/api/analysis", tags=["Analysis"])
 
 
 @app.get("/health", tags=["Health"])

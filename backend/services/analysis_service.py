@@ -396,7 +396,7 @@ _llm_cache: Dict[tuple, str] = {}
 def enrich_with_llm(extracted_data: str, module_name: str) -> str:
     """
     Generate an AI explanation of extracted analysis data.
-    Returns a fallback message if OPENAI_API_KEY is not configured.
+    Returns a fallback message if GROQ_API_KEY is not configured.
     Results are cached by (extracted_data, module_name) to avoid
     redundant API calls on repeated analysis runs.
     """
@@ -405,15 +405,15 @@ def enrich_with_llm(extracted_data: str, module_name: str) -> str:
         logger.info(f"LLM cache hit for {module_name} — skipping API call")
         return _llm_cache[cache_key]
 
-    if not settings.OPENAI_API_KEY:
-        return "AI explanation unavailable — set OPENAI_API_KEY in .env to enable."
+    if not settings.GROQ_API_KEY:
+        return "AI explanation unavailable — set GROQ_API_KEY in .env to enable."
 
     try:
-        from langchain_openai import ChatOpenAI as _ChatOpenAI
+        from langchain_groq import ChatGroq
 
-        llm = _ChatOpenAI(
+        llm = ChatGroq(
             model=settings.LLM_MODEL,
-            openai_api_key=settings.OPENAI_API_KEY,
+            api_key=settings.GROQ_API_KEY,
         )
 
         prompts = {
@@ -504,15 +504,16 @@ def query_document(
 #
 # Uses LangChain + FAISS for a self-contained RAG flow:
 #   1. chunk_document()   → split text with RecursiveCharacterTextSplitter
-#   2. build_vector_store → embed with OpenAI and store in FAISS
-#   3. generate_analysis  → RetrievalQA chain with GPT prompt
+#   2. build_vector_store → embed with HuggingFace and store in FAISS
+#   3. generate_analysis  → RetrievalQA chain with GROQ prompt
 #   4. analyze_financial_report → end-to-end pipeline
 #
-# NOTE: This uses FAISS (separate from ChromaDB) and requires OPENAI_API_KEY.
+# NOTE: This uses FAISS (separate from ChromaDB) and requires GROQ_API_KEY.
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 
 _rag_vector_stores: dict = {}  # keyed by document_id
@@ -528,12 +529,11 @@ def chunk_document(text: str) -> List[str]:
 
 
 def build_rag_vector_store(chunks: List[str], document_id: str = "default"):
-    """Embed chunks with OpenAI and store in FAISS."""
+    """Embed chunks with HuggingFace and store in FAISS."""
     global _rag_vector_stores
 
-    embeddings = OpenAIEmbeddings(
-        model=settings.EMBEDDING_MODEL,
-        openai_api_key=settings.OPENAI_API_KEY,
+    embeddings = HuggingFaceEmbeddings(
+        model_name=settings.EMBEDDING_MODEL,
     )
 
     _rag_vector_stores[document_id] = FAISS.from_texts(
@@ -546,9 +546,8 @@ def load_rag_vector_store(document_id: str = "default"):
     """Load a previously saved FAISS vector store."""
     global _rag_vector_stores
 
-    embeddings = OpenAIEmbeddings(
-        model=settings.EMBEDDING_MODEL,
-        openai_api_key=settings.OPENAI_API_KEY,
+    embeddings = HuggingFaceEmbeddings(
+        model_name=settings.EMBEDDING_MODEL,
     )
 
     _rag_vector_stores[document_id] = FAISS.load_local(
@@ -593,9 +592,9 @@ Question:
     )
 
     # Generate via LLM
-    llm = ChatOpenAI(
+    llm = ChatGroq(
         model=settings.LLM_MODEL,
-        openai_api_key=settings.OPENAI_API_KEY,
+        api_key=settings.GROQ_API_KEY,
     )
 
     formatted_prompt = prompt.format(context=context, question=query)
@@ -644,9 +643,9 @@ Question:
     formatted_prompt = prompt.format(context=context, question=query)
 
     # Stream via LLM with streaming=True
-    llm = ChatOpenAI(
+    llm = ChatGroq(
         model=settings.LLM_MODEL,
-        openai_api_key=settings.OPENAI_API_KEY,
+        api_key=settings.GROQ_API_KEY,
         streaming=True,
     )
 
