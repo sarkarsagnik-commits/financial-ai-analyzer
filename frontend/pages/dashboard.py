@@ -27,7 +27,7 @@ def show_dashboard():
     document_id = st.session_state.get("document_id")
 
     if uploaded_file and st.button("Upload & Index Document", use_container_width=True):
-        with st.spinner("Uploading and indexing document..."):
+        with st.spinner("Uploading document..."):
             try:
                 resp = requests.post(
                     f"{API_BASE_URL}/api/upload/",
@@ -35,13 +35,13 @@ def show_dashboard():
                     headers=get_auth_headers(),
                     timeout=60,
                 )
-                if resp.status_code == 200:
+                if resp.status_code in (200, 202):
                     data = resp.json()
                     st.session_state["document_id"] = data["document_id"]
                     document_id = data["document_id"]
                     st.success(
-                        f"Indexed **{data['filename']}** — "
-                        f"{data['page_count']} pages, {data['chunks_stored']} chunks stored."
+                        f"Uploaded **{data['filename']}** — "
+                        f"{data.get('message', 'Processing in background.')}"
                     )
                 else:
                     st.error(f"Upload failed: {resp.json().get('detail', 'Unknown error')}")
