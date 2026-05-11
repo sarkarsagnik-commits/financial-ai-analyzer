@@ -27,7 +27,7 @@ def show_dashboard():
     document_id = st.session_state.get("document_id")
 
     if uploaded_file and st.button("Upload & Index Document", use_container_width=True):
-        with st.spinner("Uploading and indexing document..."):
+        with st.spinner("Uploading document..."):
             try:
                 resp = requests.post(
                     f"{API_BASE_URL}/api/upload/",
@@ -35,13 +35,13 @@ def show_dashboard():
                     headers=get_auth_headers(),
                     timeout=300,
                 )
-                if resp.status_code == 200:
+                if resp.status_code in (200, 202):
                     data = resp.json()
                     st.session_state["document_id"] = data["document_id"]
                     document_id = data["document_id"]
                     st.success(
-                        f"Indexed **{data['filename']}** — "
-                        f"{data['page_count']} pages, {data['chunks_stored']} chunks stored."
+                        f"Uploaded **{data['filename']}** — "
+                        f"{data.get('message', 'Processing in background.')}"
                     )
                 else:
                     st.error(f"Upload failed: {resp.json().get('detail', 'Unknown error')}")
@@ -181,3 +181,57 @@ def show_dashboard():
                         st.error("Search failed.")
                 except requests.exceptions.ConnectionError:
                     st.error("Cannot reach backend.")
+
+    # ── AI Chat (RAG Streaming) ───────────────────────────────────────────
+    if document_id:
+        st.markdown("---")
+        st.markdown("### 🤖 AI Document Chat")
+        st.caption("Ask anything about the uploaded document. Responses are streamed live.")
+
+        # Initialize chat history in session state
+        if "chat_messages" not in st.session_state:
+            st.session_state["chat_messages"] = []
+
+        # Render chat history
+        for msg in st.session_state["chat_messages"]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        # Chat input
+        if prompt := st.chat_input("Ask about this financial document...", key="rag_chat_input"):
+            # Display user message
+            with st.chat_message("user"):
+                st.markdown(prompt)
+            st.session_state["chat_messages"].append({"role": "user", "content": prompt})
+
+            # Stream assistant response
+            with st.chat_message("assistant"):
+                try:
+                    resp = requests.post(
+                        f"{API_BASE_URL}/api/analysis/rag/stream",
+                        json={"query": prompt, "document_id": document_id},
+                        headers={**get_auth_headers(), "Content-Type": "application/json"},
+                        stream=True,
+                        timeout=120,
+                    )
+
+                    if resp.status_code == 200:
+                        def token_generator():
+                            for chunk in resp.iter_content(decode_unicode=True):
+                                if chunk:
+                                    yield chunk
+
+                        full_response = st.write_stream(token_generator())
+                        st.session_state["chat_messages"].append(
+                            {"role": "assistant", "content": full_response}
+                        )
+                    elif resp.status_code == 500:
+                        error_detail = resp.json().get("detail", "Server error")
+                        st.error(f"⚠️ {error_detail}")
+                    else:
+                        st.error(f"Request failed (HTTP {resp.status_code})")
+
+                except requests.exceptions.ConnectionError:
+                    st.error("Cannot reach backend. Is FastAPI running?")
+                except requests.exceptions.ReadTimeout:
+                    st.error("Request timed out. The document may be too large.")

@@ -19,8 +19,8 @@ class UploadResponse(BaseModel):
     document_id: str
     filename: str
     file_size: int
-    page_count: int
-    chunks_stored: int
+    page_count: int = 0
+    chunks_stored: int = 0
     message: str
 
 
