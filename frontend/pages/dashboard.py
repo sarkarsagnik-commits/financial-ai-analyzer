@@ -33,7 +33,7 @@ def show_dashboard():
                     f"{API_BASE_URL}/api/upload/",
                     files={"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")},
                     headers=get_auth_headers(),
-                    timeout=60,
+                    timeout=300,
                 )
                 if resp.status_code == 200:
                     data = resp.json()

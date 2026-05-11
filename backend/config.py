@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # --- RAG Configuration (from feature/RAG) ---
     OPENAI_API_KEY: str = ""
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
-    LLM_MODEL: str = "llama3-8b-8192"
+    LLM_MODEL: str = "llama-3.1-8b-instant"  # Updated to a more recent model, adjust as needed
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
     VECTOR_DB_PATH: str = "./vector_store"
